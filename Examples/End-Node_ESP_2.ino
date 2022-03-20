@@ -5,31 +5,37 @@ This will RECIEVE data from Coordinator ESP using ESP-NOW and Toggle BuiltIn LED
 *  github.com/JayJoshi16
 */
 
+
 #include <esp_now.h>
 #include <WiFi.h>
-
+uint8_t broadcastAddress[] = {0x3C, 0x71, 0xBF, 0x4C, 0x9C, 0xD0}; 
 #include <ArduinoJson.h>
 
 String recv_jsondata;
+String send_jsondata;
 
-StaticJsonDocument<256> doc_from_espnow;  
+
+StaticJsonDocument<256> doc_to_espnow;  
+StaticJsonDocument<256> doc_from_espnow;  // for data < 1KB
+//DynamicJsonDocument doc(1024);  // for data > 1KB
+
 
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+
   char* buff = (char*) incomingData;
   recv_jsondata = String(buff);
-  Serial.print("Recieved ");Serial.println(recv_jsondata);
+  Serial.print("Recieved "); Serial.println(recv_jsondata);
   DeserializationError error = deserializeJson(doc_from_espnow, recv_jsondata);
-  
   if (!error) {
-    const char* led_status   = doc_from_espnow["v5"];        //fetching values of v5 from doc_from_espnow JSON
-    
-    if(strstr(led_status,"v5_on"))
-    digitalWrite(2,HIGH);                            // OnBoard LED HIGH   
+    String led_status   = doc_from_espnow["v5"]; //values are 1 or 0
+    Serial.print("led status : ");Serial.println(led_status);
+    if(led_status=="v5_on")
+    digitalWrite(2,HIGH);
+    else if(led_status=="v5_off")
+    digitalWrite(2,LOW);
+    else
+    Serial.println(led_status);
 
-    else if(strstr(led_status,"v5_off"))
-    digitalWrite(2,LOW);                              // OnBoard LED LOW
-
-    led_status="";
   }
 
   else {
@@ -42,11 +48,9 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 
 void setup() {
   
-  //ONBOARD LED WILL GLOW IN CASE OR RESET
   pinMode(2,OUTPUT);
 
   Serial.begin(115200);
-  
   WiFi.mode(WIFI_STA);
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
@@ -54,9 +58,9 @@ void setup() {
   }
  
   esp_now_register_recv_cb(OnDataRecv);
-  
 }
 
 void loop() {
  
 }
+
