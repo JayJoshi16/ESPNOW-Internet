@@ -33,15 +33,15 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.print("Recieved ");Serial.println(recv_jsondata);
   DeserializationError error = deserializeJson(doc_from_espnow, recv_jsondata);
   if (!error) {
-    const char* led_status   = doc_from_espnow["v4"];       //fetching values of v4 from doc_from_espnow JSON
-    Serial.println(led_status);
+    String led_status   = doc_from_espnow["v4"];       //fetching values of v4 from doc_from_espnow JSON
     
-    if(strstr(led_status,"v4_on"))
+    if(led_status=="v4_on")
     digitalWrite(2,HIGH);                                 // OnBoard LED HIGH
     
-    else if(strstr(led_status,"v4_off"))
+    else if(led_status=="v4_off")
     digitalWrite(2,LOW);                                  // OnBoard LED LOW
-//    led_status="";
+    else
+    Serial.println(led_status);
   }
   else {
     Serial.print(F("deserializeJson() failed: "));
@@ -77,11 +77,11 @@ void setup() {
 void loop() {
                                                   // Sending Tempreature Every 4 Seconds
   float temp = dht.readTemperature();
-  send_jsondata = "";
   doc_to_espnow["v3"] = temp;                       // Creating JSON data. Here { v3 : 28.55 }
   serializeJson(doc_to_espnow, send_jsondata);
   esp_now_send(broadcastAddress, (uint8_t *) send_jsondata.c_str(), sizeof(send_jsondata)*send_jsondata.length());
                                                     // Sending it to Coordinater ESP
-  Serial.println(send_jsondata);      
+  Serial.println(send_jsondata); 
+  send_jsondata = "";
   delay(4000);
 }
