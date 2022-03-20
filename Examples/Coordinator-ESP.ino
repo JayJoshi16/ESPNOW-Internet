@@ -12,8 +12,14 @@ MAC Address of this ESP is Provided to ESD Node ESP.
 #include <WiFi.h>
 uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; //Broadcast address
 
+#include <SimpleTimer.h>
+SimpleTimer timer;
+
 #include <ArduinoJson.h>
+StaticJsonDocument<256> doc_from_espnow;
+StaticJsonDocument<256> doc_to_espnow;
 String recv_jsondata;               // recieved JSON string
+int temperature=0;
 
 #define RXD2 16
 #define TXD2 17        
@@ -24,9 +30,6 @@ String recv_jsondata;               // recieved JSON string
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-
-StaticJsonDocument<256> doc_from_espnow;
-StaticJsonDocument<256> doc_to_espnow;
 
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -43,8 +46,9 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   if (!error) {
     Serial.print("Serilising to Serial2: ");
     Serial.println(recv_jsondata);
-    int temp  = doc_from_espnow["v3"];                 // Data to be displayed on OLED
-    displayText(String(temp));                          // Displaying Data
+    temperature  = doc_from_espnow["v3"];                 // Data to be displayed on OLED
+    timer.setTimeout(2000,displayText);                   // One Shot Timer
+    
     serializeJson(doc_from_espnow, Serial2);            // Writing Data to Serial2
   }
 
@@ -56,36 +60,37 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
 
 }
 
-void displayText(String text) {                   // Function that Displays tempreature on OLED
+void displayText() {       // Function that Displays tempreature on OLED
   display.clearDisplay();
-  display.setCursor(0, 10);
-  display.println("Temp is :");
-  display.setCursor(0, 40);
-  display.println(text);
+  display.setTextSize(1);    
+  display.setTextColor(SSD1306_WHITE); 
+  display.setCursor(2, 10);    
+  display.print("Temperature :");
+  display.setCursor(2, 40);
+  display.print(temperature);
   display.display();
 }
 
 void setup() {
 
-                //ONBOARD LED WILL GLOW IN CASE OF RESET
+  //ONBOARD LED WILL GLOW IN CASE OF RESET
   pinMode(2, OUTPUT);
   digitalWrite(2, HIGH);
   delay(2000);
   digitalWrite(2, LOW);
   delay(2000);
 
-
+  Serial.begin(115200);
+  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
+  
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {                // Address 0x3D for 128x64
     Serial.println(F("SSD1306 allocation failed"));
     for (;;);
   }
-  delay(2000);
+  delay(200);
+  display.display();
   display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-
-  Serial.begin(115200);
-  Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
+  delay(200);
 
   WiFi.mode(WIFI_STA);
   if (esp_now_init() != ESP_OK) {
@@ -108,7 +113,7 @@ void setup() {
 }
 
 void loop() {
-
+  timer.run();
   if (Serial2.available()) {                                      // Recieving data (JSON) from BLYNK ESP
     String recv_str_jsondata = Serial2.readStringUntil('\n');
     serializeJson(doc_to_espnow, recv_str_jsondata);              //Serilizing JSON
